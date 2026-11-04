@@ -1,0 +1,216 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Tiger 5">
+<title>Tiger 5 Golf Tracker</title>
+<style>
+:root{--bg:#eef1ee;--card:#fbfcfb;--ink:#12201a;--mut:#5b6b62;--line:#d5ddd7;--acc:#1d6b43;--acc-ink:#fff;--bad:#b8322a;--good:#1d6b43;--chip:#e2e9e4;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#0e1712;--card:#16231b;--ink:#e7efe9;--mut:#98ab9f;--line:#2a3c31;--acc:#5cc58a;--acc-ink:#07140c;--bad:#ff8173;--good:#5cc58a;--chip:#21342a;color-scheme:dark}}
+:root[data-theme="dark"]{--bg:#0e1712;--card:#16231b;--ink:#e7efe9;--mut:#98ab9f;--line:#2a3c31;--acc:#5cc58a;--acc-ink:#07140c;--bad:#ff8173;--good:#5cc58a;--chip:#21342a;color-scheme:dark}
+*{box-sizing:border-box}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.4 system-ui,-apple-system,"Segoe UI",sans-serif;padding:0 14px 96px;max-width:640px;margin:0 auto}
+button{font-family:inherit;cursor:pointer}
+header{padding:14px 0 6px}h1{font-size:22px;margin:0}header p{margin:2px 0 0;color:var(--mut);font-size:13px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:14px;margin:12px 0}
+h2{font-size:17px;margin:0 0 6px}
+.holes{display:grid;grid-template-columns:repeat(9,1fr);gap:6px;margin-top:8px}
+.holes button{padding:9px 0;border-radius:8px;border:1px solid var(--line);background:var(--card);color:var(--ink);font-size:14px}
+.holes .done{background:var(--chip)}
+.holes .cur{background:var(--acc);color:var(--acc-ink);border-color:var(--acc)}
+.row{display:flex;justify-content:space-between;align-items:center;padding:7px 0;border-top:1px solid var(--line)}
+h2+.row{border-top:0}
+.stp{display:flex;align-items:center;gap:12px}
+.stp b{min-width:34px;text-align:center;font:600 26px Georgia,"Times New Roman",serif}
+.stp button{width:46px;height:46px;border-radius:50%;border:1px solid var(--line);background:var(--chip);color:var(--ink);font-size:22px}
+.res{margin:2px 0 6px;font-weight:600;color:var(--acc)}
+.tgs{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:10px}
+.tg{padding:13px 8px;border-radius:10px;border:1px solid var(--line);background:var(--card);color:var(--ink);font-size:14px}
+.tg.on{background:var(--acc);color:var(--acc-ink);border-color:var(--acc);font-weight:600}
+.fl{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px;font-size:13px}
+.fl span{background:var(--bad);color:var(--acc-ink);border-radius:999px;padding:4px 10px}
+.fl em{color:var(--good)}
+.nav2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.nav2 button,.main{padding:14px;border-radius:10px;border:0;background:var(--acc);color:var(--acc-ink);font-size:16px;font-weight:600}
+.main{width:100%;margin-top:12px}
+.main.alt{background:var(--chip);color:var(--ink)}
+textarea{width:100%;margin-top:8px;padding:10px;border-radius:10px;border:1px solid var(--line);background:var(--bg);color:var(--ink);font:16px ui-monospace,Menlo,monospace}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.tile{background:var(--chip);border-radius:10px;padding:10px}
+.tile small{display:block;color:var(--mut);font-size:12px}
+.tile b{font:600 20px Georgia,"Times New Roman",serif}
+.tile.bad b{color:var(--bad)}.tile.good b{color:var(--good)}
+.mut{color:var(--mut);margin:4px 0}
+.del{border:0;background:none;color:var(--bad);font-size:14px;padding:8px}
+nav{position:fixed;left:0;right:0;bottom:0;display:grid;grid-template-columns:1fr 1fr;background:var(--card);border-top:1px solid var(--line);padding-bottom:env(safe-area-inset-bottom,0px)}
+nav button{padding:14px;border:0;background:none;color:var(--mut);font-size:15px;font-weight:600}
+nav .on{color:var(--acc)}
+[hidden]{display:none}
+</style></head><body>
+<header><h1>Tiger 5 Tracker</h1><p>Saved on this device and backed up when you finish a round. GIR is worked out from score and putts.</p></header>
+<main id="round"></main><main id="stats" hidden></main>
+<nav><button data-a="tab" data-k="round">Round</button><button data-a="tab" data-k="stats">Stats</button></nav>
+<script>
+const $=id=>document.getElementById(id);
+const KEY='tiger5-cur',HK='tiger5-hist';
+const T5=['3-putts','Par 5 bogeys','Double bogeys+','Wedge bogeys','Missed easy up-and-downs'];
+const mk=()=>Array.from({length:18},()=>({par:4,s:0,p:0,fw:0,rec:0,ch:0,bk:0,wd:0,eu:0}));
+let st={h:mk(),i:0},hist=[],tab='round',arm=null,ref=null,cloud=null,bk={s:'load',m:''},io='',im='';
+const cl=o=>JSON.parse(JSON.stringify(o));
+function load(){
+  try{const a=JSON.parse(localStorage.getItem(KEY));if(a&&a.h&&a.h.length==18)st=a}catch(e){}
+  try{const b=JSON.parse(localStorage.getItem(HK));if(Array.isArray(b))hist=b}catch(e){}
+}
+function save(){try{localStorage.setItem(KEY,JSON.stringify(st));localStorage.setItem(HK,JSON.stringify(hist))}catch(e){}}
+async function initCloud(){
+  try{
+    if(typeof claude=='undefined'){bk.s='off';render();return}
+    const u=await claude.use('user'),d=await claude.use('db'),id=u?await u.id():null;
+    if(!d||!id){bk.s='off';render();return}
+    ref=d.doc('data/users/'+id+'/latest');
+    const sn=await ref.get();cloud=sn.exists?sn.data():null;bk.s='ok';
+  }catch(e){bk.s='err'}
+  render();
+}
+async function backup(merge){
+  if(!ref)return;
+  try{
+    if(merge){
+      const sn=await ref.get();cloud=sn.exists?sn.data():null;
+      if(cloud&&Array.isArray(cloud.hist)){
+        const seen=new Set(hist.map(z=>z.d));
+        hist=hist.concat(cl(cloud.hist.filter(z=>!seen.has(z.d)))).sort((a,b)=>b.d-a.d);
+      }
+    }
+    const body=cl({t:Date.now(),hist:hist,cur:st});
+    await ref.set(body);cloud=body;bk.m='Backed up '+hist.length+' rounds.';
+  }catch(e){bk.m='Backup failed. Your rounds are still saved on this device.'}
+  render();
+}
+async function restore(){
+  if(!ref)return;
+  try{
+    const sn=await ref.get(),c=sn.exists?sn.data():null;
+    if(!c||!Array.isArray(c.hist)){bk.m='No backup found.'}
+    else{
+      cloud=c;hist=cl(c.hist);
+      if(!st.h.some(y=>y.s>0)&&c.cur&&c.cur.h&&c.cur.h.length==18)st=cl(c.cur);
+      bk.m='Restored '+hist.length+' rounds.';
+    }
+  }catch(e){bk.m='Restore failed. Try again later.'}
+  render();
+}
+function bkHtml(){
+  const has=cloud&&Array.isArray(cloud.hist)&&cloud.hist.length;
+  const s=bk.s=='load'?'Checking for a backup…':bk.s=='off'?'Cloud backup works when this page is opened in Claude while signed in.':bk.s=='err'?'Could not reach the backup right now.':has?`Latest backup: ${cloud.hist.length} rounds, saved ${new Date(cloud.t).toLocaleString(undefined,{month:'short',day:'numeric',hour:'numeric',minute:'2-digit'})}.`:'No backup yet. One is saved automatically when you finish a round.';
+  return `<p class="mut">${s}</p>${bk.m?`<p class="res">${bk.m}</p>`:''}`+(bk.s=='off'?'':`<button class="main" data-a="bk">Back up now</button>`)+(has?`<button class="main alt" data-a="rest" ${hist.length?'data-c="rest"':''}>${arm=='rest'?'Tap again to replace the rounds on this device':'Restore from backup'}</button>`:'');
+}
+const nz=v=>Math.max(0,Math.min(20,Math.round(+v||0)));
+const fh=y=>({par:Math.min(5,Math.max(3,Math.round(+y.par)||4)),s:nz(y.s),p:nz(y.p),fw:y.fw?1:0,rec:y.rec?1:0,ch:nz(y.ch),bk:nz(y.bk),wd:y.wd?1:0,eu:y.eu?1:0});
+async function doExport(){
+  io=JSON.stringify({app:'tiger5',v:1,t:Date.now(),hist:hist,cur:st});
+  let ok=false;
+  try{await navigator.clipboard.writeText(io);ok=true}catch(e){}
+  im=ok?'Copied. Paste it somewhere safe, like Notes.':'Select the text below and copy it.';
+  render();
+}
+function doImport(){
+  try{
+    const o=JSON.parse(io.trim()),r=Array.isArray(o)?o:o.hist;
+    if(!Array.isArray(r))throw 0;
+    const seen=new Set(hist.map(z=>z.d));
+    const add=r.filter(z=>z&&typeof z.d=='number'&&Array.isArray(z.h)&&z.h.length==18&&!seen.has(z.d)).map(z=>({d:z.d,h:z.h.map(fh)}));
+    hist=hist.concat(add).sort((a,b)=>b.d-a.d);
+    if(!Array.isArray(o)&&!st.h.some(y=>y.s>0)&&o.cur&&Array.isArray(o.cur.h)&&o.cur.h.length==18)st={h:o.cur.h.map(fh),i:0};
+    im='Added '+add.length+' round'+(add.length==1?'':'s')+'.';io='';
+  }catch(e){im='That text is not a valid backup. Paste the full text you copied.'}
+  render();
+}
+function ioHtml(){
+  const e=s=>s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  return `<p class="mut">Copy your rounds as text to keep a backup, or paste a backup below to add its rounds.</p>${im?`<p class="res">${im}</p>`:''}<textarea id="io" rows="5" placeholder="Backup text appears here, or paste a backup to import">${e(io)}</textarea><button class="main" data-a="exp">Copy backup text</button><button class="main alt" data-a="imp">Import pasted backup</button>`;
+}
+const vp=d=>d>0?'+'+d:d<0?String(d):'E';
+const nm=d=>d<=-3?'Albatross':['Eagle','Birdie','Par','Bogey','Double bogey','Triple bogey'][d+2]||('+'+d);
+function flags(x){
+  const f=[];if(!x.s)return f;
+  if(x.p>=3)f.push(0);
+  if(x.par==5&&x.s>x.par)f.push(1);
+  if(x.s-x.par>=2)f.push(2);
+  if(x.wd&&x.s>x.par)f.push(3);
+  if(x.eu)f.push(4);
+  return f;
+}
+function stats(h){
+  const p=h.filter(x=>x.s>0),r={n:p.length,sc:0,par:0,pu:0,gir:0,fw:0,fwn:0,rec:0,ch:0,bk:0,t:[0,0,0,0,0]};
+  p.forEach(x=>{r.sc+=x.s;r.par+=x.par;r.pu+=x.p;if(x.s-x.p<=x.par-2)r.gir++;if(x.par>3){r.fwn++;if(x.fw)r.fw++}r.rec+=x.rec;r.ch+=x.ch;r.bk+=x.bk;flags(x).forEach(i=>r.t[i]++)});
+  r.tt=r.t.reduce((a,b)=>a+b,0);return r;
+}
+function rRound(){
+  const x=st.h[st.i],fl=flags(x),d=x.s-x.par,gir=x.s>0&&x.s-x.p<=x.par-2;
+  const S=(l,k)=>`<div class="row"><span>${l}</span><div class="stp"><button data-a="m" data-k="${k}" aria-label="Decrease ${l}">−</button><b>${k=='s'&&!x.s?'–':x[k]}</b><button data-a="p" data-k="${k}" aria-label="Increase ${l}">+</button></div></div>`;
+  const T=(l,k)=>`<button class="tg ${x[k]?'on':''}" data-a="t" data-k="${k}">${l}</button>`;
+  const ban=(!hist.length&&cloud&&Array.isArray(cloud.hist)&&cloud.hist.length)?`<button class="main" data-a="rest">Backup found with ${cloud.hist.length} saved rounds. Tap to restore.</button>`:'';
+  $('round').innerHTML=`${ban}<div class="holes">${st.h.map((y,i)=>`<button data-a="h" data-k="${i}" class="${i==st.i?'cur':''} ${y.s?'done':''}">${i+1}</button>`).join('')}</div>
+<div class="card"><h2>Hole ${st.i+1}</h2>${S('Par','par')}${S('Score','s')}
+<p class="res">${x.s?nm(d)+(gir?', green in regulation':', missed green'):'Tap + to enter your score'}</p>
+${S('Putts','p')}${S('Chips','ch')}${S('Bunker shots','bk')}
+<div class="tgs">${x.par>3?T('Fairway hit','fw'):''}${T('Recovery shot','rec')}${T('Wedge in hand','wd')}${T('Missed easy up-and-down','eu')}</div>
+<div class="fl">${fl.length?fl.map(i=>`<span>${T5[i]}</span>`).join(''):(x.s?'<em>Clean hole, no Tiger 5 mistakes</em>':'')}</div></div>
+<div class="nav2"><button data-a="pv">Previous hole</button><button data-a="nx">Next hole</button></div>`;
+}
+function rStats(){
+  const r=stats(st.h),A=stats(hist.flatMap(z=>z.h)),n=hist.length;
+  const sec=(t,b)=>`<div class="card"><h2>${t}</h2>${b}</div>`;
+  const g=a=>`<div class="grid">${a.map(([l,v,c])=>`<div class="tile ${c||''}"><small>${l}</small><b>${v}</b></div>`).join('')}</div>`;
+  const pc=(a,b)=>b?Math.round(100*a/b)+'%':'–';
+  const av=v=>n?(v/n).toFixed(1):'–';
+  const list=hist.map((z,j)=>{const q=stats(z.h);return `<div class="row"><span>${new Date(z.d).toLocaleDateString(undefined,{month:'short',day:'numeric'})}: ${q.sc} (${vp(q.sc-q.par)}), ${q.tt} Tiger 5 misses</span><button class="del" data-a="del" data-k="${j}" data-c="del">${arm=='del'+j?'Confirm delete':'Delete'}</button></div>`}).join('');
+  $('stats').innerHTML=
+    sec('Tiger 5 this round',g(T5.map((l,i)=>[l,r.t[i],r.t[i]?'bad':'good'])))+
+    sec(`This round, ${r.n} of 18 holes`,g([
+      ['Score',r.n?`${r.sc} (${vp(r.sc-r.par)})`:'–'],
+      ['Putts',r.n?`${r.pu} (${(r.pu/r.n).toFixed(1)} a hole)`:'–'],
+      ['Greens in regulation',`${r.gir}/${r.n} (${pc(r.gir,r.n)})`],
+      ['Fairways hit',`${r.fw}/${r.fwn} (${pc(r.fw,r.fwn)})`],
+      ['Recovery shots',r.rec],['Chips',r.ch],['Bunker shots',r.bk]
+    ])+`<button class="main" data-a="fin" data-c="fin">${arm=='fin'?'Tap again to save and start a new round':'Finish and save round'}</button>`)+
+    sec(`Saved rounds: ${n}`,n?`<p class="mut">Averages per round</p>`+g([
+      ...T5.map((l,i)=>[l,av(A.t[i])]),
+      ['Greens in regulation',pc(A.gir,A.n)],['Fairways hit',pc(A.fw,A.fwn)],
+      ['Putts a hole',(A.pu/A.n).toFixed(1)],['Recovery shots',av(A.rec)],['Chips',av(A.ch)],['Bunker shots',av(A.bk)]
+    ])+list:'<p class="mut">Finish a round to see your averages here.</p>')+(bk.s=='off'?'':sec('Backup',bkHtml()))+sec('Export and import',ioHtml());
+}
+function render(){
+  $('round').hidden=tab!='round';$('stats').hidden=tab!='stats';
+  document.querySelectorAll('nav button').forEach(b=>b.classList.toggle('on',b.dataset.k==tab));
+  if(tab=='round')rRound();else rStats();
+  save();
+}
+document.addEventListener('click',e=>{
+  const b=e.target.closest('[data-a]');if(!b)return;
+  const a=b.dataset.a,k=b.dataset.k,x=st.h[st.i];
+  let post=null;
+  if(b.dataset.c){const key=b.dataset.c+(k||'');if(arm!=key){arm=key;render();return}arm=null}else arm=null;
+  if(a=='m'||a=='p'){
+    const d=a=='p'?1:-1;let v=x[k];
+    v=(k=='s'&&v==0&&d==1)?x.par:v+d;
+    x[k]=Math.max(k=='par'?3:0,Math.min(k=='par'?5:k=='s'?15:10,v));
+  }else if(a=='t'){x[k]=x[k]?0:1}
+  else if(a=='h'){st.i=+k}
+  else if(a=='nx'){st.i=Math.min(17,st.i+1)}
+  else if(a=='pv'){st.i=Math.max(0,st.i-1)}
+  else if(a=='tab'){tab=k}
+  else if(a=='fin'){if(st.h.some(y=>y.s>0)){hist.unshift({d:Date.now(),h:st.h});st={h:mk(),i:0};tab='stats';if(ref){bk.m='Backing up…';post=()=>backup(true)}else bk.m=''}}
+  else if(a=='del'){hist.splice(+k,1);if(ref){bk.m='Backing up…';post=()=>backup(false)}}
+  else if(a=='bk'){if(ref){bk.m='Backing up…';post=()=>backup(true)}else bk.m='Backup is not ready yet. Try again in a moment.'}
+  else if(a=='rest'){bk.m='Restoring…';post=restore}
+  else if(a=='exp'){post=doExport}
+  else if(a=='imp'){post=doImport}
+  render();if(post)post();
+});
+document.addEventListener('input',e=>{if(e.target.id=='io')io=e.target.value});
+load();render();initCloud();
+</script></body></html>
