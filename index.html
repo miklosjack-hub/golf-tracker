@@ -44,24 +44,41 @@ textarea{width:100%;margin-top:8px;padding:10px;border-radius:10px;border:1px so
 .tile.bad b{color:var(--bad)}.tile.good b{color:var(--good)}
 .mut{color:var(--mut);margin:4px 0}
 .del{border:0;background:none;color:var(--bad);font-size:14px;padding:8px}
-nav{position:fixed;left:0;right:0;bottom:0;display:grid;grid-template-columns:1fr 1fr;background:var(--card);border-top:1px solid var(--line);padding-bottom:env(safe-area-inset-bottom,0px)}
+nav{position:fixed;left:0;right:0;bottom:0;display:grid;grid-template-columns:1fr 1fr 1fr;background:var(--card);border-top:1px solid var(--line);padding-bottom:env(safe-area-inset-bottom,0px)}
 nav button{padding:14px;border:0;background:none;color:var(--mut);font-size:15px;font-weight:600}
 nav .on{color:var(--acc)}
 [hidden]{display:none}
+.meta{display:grid;grid-template-columns:3fr 2fr;gap:8px}
+.meta label{font-size:12px;color:var(--mut)}
+.meta input{display:block;width:100%;margin-top:4px;padding:10px;border-radius:10px;border:1px solid var(--line);background:var(--bg);color:var(--ink);font:16px system-ui,sans-serif}
+.rd{width:100%;text-align:left;background:none;border:0;border-top:1px solid var(--line);padding:10px 0;color:var(--ink);font-size:16px;font-weight:600}
+.rd small{display:block;color:var(--mut);font-weight:400;font-size:13px}
+.tbl{overflow-x:auto}
+table{border-collapse:collapse;width:100%;font-size:14px;text-align:center}
+th,td{padding:7px 4px;border-top:1px solid var(--line)}
+th{color:var(--mut);font-weight:600;font-size:12px}
+td.bad{color:var(--bad);font-weight:600}
+.back{border:0;background:none;color:var(--acc);font-size:15px;font-weight:600;padding:8px 0}
 </style></head><body>
 <header><h1>Tiger 5 Tracker</h1><p>Saved on this device and backed up when you finish a round. GIR is worked out from score and putts.</p></header>
-<main id="round"></main><main id="stats" hidden></main>
-<nav><button data-a="tab" data-k="round">Round</button><button data-a="tab" data-k="stats">Stats</button></nav>
+<main id="round"></main><main id="stats" hidden></main><main id="rounds" hidden></main>
+<nav><button data-a="tab" data-k="round">Round</button><button data-a="tab" data-k="stats">Stats</button><button data-a="tab" data-k="rounds">Rounds</button></nav>
 <script>
 const $=id=>document.getElementById(id);
 const KEY='tiger5-cur',HK='tiger5-hist';
 const T5=['3-putts','Par 5 bogeys','Double bogeys+','Wedge bogeys','Missed easy up-and-downs'];
 const mk=()=>Array.from({length:18},()=>({par:4,s:0,p:0,fw:0,rec:0,ch:0,bk:0,wd:0,eu:0}));
-let st={h:mk(),i:0},hist=[],tab='round',arm=null,ref=null,cloud=null,bk={s:'load',m:''},io='',im='';
+let st={h:mk(),i:0,course:'',date:''},hist=[],rev=null,tab='round',arm=null,ref=null,cloud=null,bk={s:'load',m:''},io='',im='';
 const cl=o=>JSON.parse(JSON.stringify(o));
+const esc=s=>String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+const today=()=>{const d=new Date();return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0')};
+const fixSt=()=>{if(typeof st.course!='string')st.course='';if(!/^\d{4}-\d{2}-\d{2}$/.test(st.date||''))st.date=today()};
+const fd=z=>(z.date?new Date(z.date+'T12:00:00'):new Date(z.d)).toLocaleDateString(undefined,{month:'short',day:'numeric',year:'numeric'});
+const cname=z=>z.course||'Course not named';
 function load(){
   try{const a=JSON.parse(localStorage.getItem(KEY));if(a&&a.h&&a.h.length==18)st=a}catch(e){}
   try{const b=JSON.parse(localStorage.getItem(HK));if(Array.isArray(b))hist=b}catch(e){}
+  fixSt();
 }
 function save(){try{localStorage.setItem(KEY,JSON.stringify(st));localStorage.setItem(HK,JSON.stringify(hist))}catch(e){}}
 async function initCloud(){
@@ -96,7 +113,7 @@ async function restore(){
     if(!c||!Array.isArray(c.hist)){bk.m='No backup found.'}
     else{
       cloud=c;hist=cl(c.hist);
-      if(!st.h.some(y=>y.s>0)&&c.cur&&c.cur.h&&c.cur.h.length==18)st=cl(c.cur);
+      if(!st.h.some(y=>y.s>0)&&c.cur&&c.cur.h&&c.cur.h.length==18)st=cl(c.cur);fixSt();
       bk.m='Restored '+hist.length+' rounds.';
     }
   }catch(e){bk.m='Restore failed. Try again later.'}
@@ -121,9 +138,9 @@ function doImport(){
     const o=JSON.parse(io.trim()),r=Array.isArray(o)?o:o.hist;
     if(!Array.isArray(r))throw 0;
     const seen=new Set(hist.map(z=>z.d));
-    const add=r.filter(z=>z&&typeof z.d=='number'&&Array.isArray(z.h)&&z.h.length==18&&!seen.has(z.d)).map(z=>({d:z.d,h:z.h.map(fh)}));
+    const add=r.filter(z=>z&&typeof z.d=='number'&&Array.isArray(z.h)&&z.h.length==18&&!seen.has(z.d)).map(z=>({d:z.d,h:z.h.map(fh),course:String(z.course||'').slice(0,60),date:/^\d{4}-\d{2}-\d{2}$/.test(z.date)?z.date:''}));
     hist=hist.concat(add).sort((a,b)=>b.d-a.d);
-    if(!Array.isArray(o)&&!st.h.some(y=>y.s>0)&&o.cur&&Array.isArray(o.cur.h)&&o.cur.h.length==18)st={h:o.cur.h.map(fh),i:0};
+    if(!Array.isArray(o)&&!st.h.some(y=>y.s>0)&&o.cur&&Array.isArray(o.cur.h)&&o.cur.h.length==18)st={h:o.cur.h.map(fh),i:0,course:String(o.cur.course||'').slice(0,60),date:o.cur.date};fixSt();
     im='Added '+add.length+' round'+(add.length==1?'':'s')+'.';io='';
   }catch(e){im='That text is not a valid backup. Paste the full text you copied.'}
   render();
@@ -153,7 +170,7 @@ function rRound(){
   const S=(l,k)=>`<div class="row"><span>${l}</span><div class="stp"><button data-a="m" data-k="${k}" aria-label="Decrease ${l}">−</button><b>${k=='s'&&!x.s?'–':x[k]}</b><button data-a="p" data-k="${k}" aria-label="Increase ${l}">+</button></div></div>`;
   const T=(l,k)=>`<button class="tg ${x[k]?'on':''}" data-a="t" data-k="${k}">${l}</button>`;
   const ban=(!hist.length&&cloud&&Array.isArray(cloud.hist)&&cloud.hist.length)?`<button class="main" data-a="rest">Backup found with ${cloud.hist.length} saved rounds. Tap to restore.</button>`:'';
-  $('round').innerHTML=`${ban}<div class="holes">${st.h.map((y,i)=>`<button data-a="h" data-k="${i}" class="${i==st.i?'cur':''} ${y.s?'done':''}">${i+1}</button>`).join('')}</div>
+  $('round').innerHTML=`${ban}<div class="card meta"><label>Course<input id="course" list="cs" value="${esc(st.course)}" placeholder="Course name" autocomplete="off"></label><label>Date<input id="date" type="date" value="${esc(st.date)}"></label><datalist id="cs">${[...new Set(hist.map(z=>z.course).filter(Boolean))].map(c=>`<option value="${esc(c)}">`).join('')}</datalist></div><div class="holes">${st.h.map((y,i)=>`<button data-a="h" data-k="${i}" class="${i==st.i?'cur':''} ${y.s?'done':''}">${i+1}</button>`).join('')}</div>
 <div class="card"><h2>Hole ${st.i+1}</h2>${S('Par','par')}${S('Score','s')}
 <p class="res">${x.s?nm(d)+(gir?', green in regulation':', missed green'):'Tap + to enter your score'}</p>
 ${S('Putts','p')}${S('Chips','ch')}${S('Bunker shots','bk')}
@@ -161,32 +178,57 @@ ${S('Putts','p')}${S('Chips','ch')}${S('Bunker shots','bk')}
 <div class="fl">${fl.length?fl.map(i=>`<span>${T5[i]}</span>`).join(''):(x.s?'<em>Clean hole, no Tiger 5 mistakes</em>':'')}</div></div>
 <div class="nav2"><button data-a="pv">Previous hole</button><button data-a="nx">Next hole</button></div>`;
 }
+const sec=(t,b)=>`<div class="card"><h2>${t}</h2>${b}</div>`;
+const g=a=>`<div class="grid">${a.map(([l,v,c])=>`<div class="tile ${c||''}"><small>${l}</small><b>${v}</b></div>`).join('')}</div>`;
+const pc=(a,b)=>b?Math.round(100*a/b)+'%':'–';
 function rStats(){
-  const r=stats(st.h),A=stats(hist.flatMap(z=>z.h)),n=hist.length;
-  const sec=(t,b)=>`<div class="card"><h2>${t}</h2>${b}</div>`;
-  const g=a=>`<div class="grid">${a.map(([l,v,c])=>`<div class="tile ${c||''}"><small>${l}</small><b>${v}</b></div>`).join('')}</div>`;
-  const pc=(a,b)=>b?Math.round(100*a/b)+'%':'–';
-  const av=v=>n?(v/n).toFixed(1):'–';
-  const list=hist.map((z,j)=>{const q=stats(z.h);return `<div class="row"><span>${new Date(z.d).toLocaleDateString(undefined,{month:'short',day:'numeric'})}: ${q.sc} (${vp(q.sc-q.par)}), ${q.tt} Tiger 5 misses</span><button class="del" data-a="del" data-k="${j}" data-c="del">${arm=='del'+j?'Confirm delete':'Delete'}</button></div>`}).join('');
+  const r=stats(st.h);
   $('stats').innerHTML=
     sec('Tiger 5 this round',g(T5.map((l,i)=>[l,r.t[i],r.t[i]?'bad':'good'])))+
-    sec(`This round, ${r.n} of 18 holes`,g([
+    sec(`${esc(st.course||'This round')}, ${r.n} of 18 holes`,g([
       ['Score',r.n?`${r.sc} (${vp(r.sc-r.par)})`:'–'],
       ['Putts',r.n?`${r.pu} (${(r.pu/r.n).toFixed(1)} a hole)`:'–'],
       ['Greens in regulation',`${r.gir}/${r.n} (${pc(r.gir,r.n)})`],
       ['Fairways hit',`${r.fw}/${r.fwn} (${pc(r.fw,r.fwn)})`],
       ['Recovery shots',r.rec],['Chips',r.ch],['Bunker shots',r.bk]
-    ])+`<button class="main" data-a="fin" data-c="fin">${arm=='fin'?'Tap again to save and start a new round':'Finish and save round'}</button>`)+
-    sec(`Saved rounds: ${n}`,n?`<p class="mut">Averages per round</p>`+g([
-      ...T5.map((l,i)=>[l,av(A.t[i])]),
+    ])+`<button class="main" data-a="fin" data-c="fin">${arm=='fin'?'Tap again to save and start a new round':'Finish and save round'}</button>`);
+}
+function rReview(z,j){
+  const q=stats(z.h),sh=['3P','P5','DB','WB','UD'];
+  const rows=z.h.map((x,i)=>[x,i]).filter(([x])=>x.s>0).map(([x,i])=>{const f=flags(x);
+    return `<tr><td>${i+1}</td><td>${x.par}</td><td><b>${x.s}</b></td><td>${x.p}</td><td>${x.s-x.p<=x.par-2?'✓':'–'}</td><td>${x.par>3?(x.fw?'✓':'–'):''}</td><td>${x.ch}</td><td>${x.bk}</td><td>${x.rec}</td><td class="${f.length?'bad':''}">${f.map(n=>sh[n]).join(' ')||'–'}</td></tr>`}).join('');
+  return `<button class="back" data-a="back">Back to rounds</button>`+
+    sec(`${esc(cname(z))}, ${fd(z)}`,g([
+      ['Score',`${q.sc} (${vp(q.sc-q.par)})`],['Holes played',q.n],
+      ['Putts',`${q.pu} (${q.n?(q.pu/q.n).toFixed(1):'–'} a hole)`],
+      ['Greens in regulation',`${q.gir}/${q.n} (${pc(q.gir,q.n)})`],
+      ['Fairways hit',`${q.fw}/${q.fwn} (${pc(q.fw,q.fwn)})`],
+      ['Recovery shots',q.rec],['Chips',q.ch],['Bunker shots',q.bk]]))+
+    sec('Tiger 5 in this round',g(T5.map((l,i)=>[l,q.t[i],q.t[i]?'bad':'good'])))+
+    sec('Hole by hole',`<div class="tbl"><table><tr><th>Hole</th><th>Par</th><th>Score</th><th>Putts</th><th>GIR</th><th>FW</th><th>Chip</th><th>Bkr</th><th>Rec</th><th>Tiger 5</th></tr>${rows}</table></div><p class="mut">3P three-putt, P5 par 5 bogey or worse, DB double bogey or worse, WB wedge bogey, UD missed easy up-and-down.</p>`)+
+    `<button class="main alt" data-a="del" data-c="del" data-k="${j}">${arm=='del'+j?'Tap again to delete this round':'Delete this round'}</button>`;
+}
+function rRounds(){
+  if(rev!==null&&hist[rev]){$('rounds').innerHTML=rReview(hist[rev],rev);return}
+  rev=null;
+  const A=stats(hist.flatMap(z=>z.h)),n=hist.length,av=v=>n?(v/n).toFixed(1):'–';
+  const full=hist.map(z=>stats(z.h)).filter(q=>q.n==18).map(q=>q.sc);
+  const list=hist.map((z,j)=>{const q=stats(z.h);return `<button class="rd" data-a="open" data-k="${j}">${esc(cname(z))}<small>${fd(z)}: ${q.n<18?q.n+' holes, ':''}${q.sc} (${vp(q.sc-q.par)}), ${q.tt} Tiger 5 misses</small></button>`}).join('');
+  $('rounds').innerHTML=
+    sec(`Averages, ${n} saved round${n==1?'':'s'}`,n?g([
+      ['Average score, 18 holes',full.length?(full.reduce((a,b)=>a+b,0)/full.length).toFixed(1):'–'],
+      ['Best score, 18 holes',full.length?Math.min(...full):'–'],
+      ...T5.map((l,i)=>[l+' a round',av(A.t[i])]),
       ['Greens in regulation',pc(A.gir,A.n)],['Fairways hit',pc(A.fw,A.fwn)],
-      ['Putts a hole',(A.pu/A.n).toFixed(1)],['Recovery shots',av(A.rec)],['Chips',av(A.ch)],['Bunker shots',av(A.bk)]
-    ])+list:'<p class="mut">Finish a round to see your averages here.</p>')+(bk.s=='off'?'':sec('Backup',bkHtml()))+sec('Export and import',ioHtml());
+      ['Putts a hole',(A.pu/A.n).toFixed(1)],['Recovery shots a round',av(A.rec)],['Chips a round',av(A.ch)],['Bunker shots a round',av(A.bk)]
+    ]):'<p class="mut">Finish and save a round on the Stats tab to see averages and review it here.</p>')+
+    (n?sec('Saved rounds',list+'<p class="mut">Tap a round to review it hole by hole.</p>'):'')+
+    (bk.s=='off'?'':sec('Backup',bkHtml()))+sec('Export and import',ioHtml());
 }
 function render(){
-  $('round').hidden=tab!='round';$('stats').hidden=tab!='stats';
+  $('round').hidden=tab!='round';$('stats').hidden=tab!='stats';$('rounds').hidden=tab!='rounds';
   document.querySelectorAll('nav button').forEach(b=>b.classList.toggle('on',b.dataset.k==tab));
-  if(tab=='round')rRound();else rStats();
+  if(tab=='round')rRound();else if(tab=='stats')rStats();else rRounds();
   save();
 }
 document.addEventListener('click',e=>{
@@ -202,15 +244,17 @@ document.addEventListener('click',e=>{
   else if(a=='h'){st.i=+k}
   else if(a=='nx'){st.i=Math.min(17,st.i+1)}
   else if(a=='pv'){st.i=Math.max(0,st.i-1)}
-  else if(a=='tab'){tab=k}
-  else if(a=='fin'){if(st.h.some(y=>y.s>0)){hist.unshift({d:Date.now(),h:st.h});st={h:mk(),i:0};tab='stats';if(ref){bk.m='Backing up…';post=()=>backup(true)}else bk.m=''}}
-  else if(a=='del'){hist.splice(+k,1);if(ref){bk.m='Backing up…';post=()=>backup(false)}}
+  else if(a=='tab'){tab=k;if(k!='rounds')rev=null}
+  else if(a=='open'){rev=+k}
+  else if(a=='back'){rev=null}
+  else if(a=='fin'){if(st.h.some(y=>y.s>0)){hist.unshift({d:Date.now(),h:st.h,course:st.course.trim().slice(0,60),date:st.date});st={h:mk(),i:0,course:'',date:today()};tab='rounds';rev=null;if(ref){bk.m='Backing up…';post=()=>backup(true)}else bk.m=''}}
+  else if(a=='del'){hist.splice(+k,1);rev=null;if(ref){bk.m='Backing up…';post=()=>backup(false)}}
   else if(a=='bk'){if(ref){bk.m='Backing up…';post=()=>backup(true)}else bk.m='Backup is not ready yet. Try again in a moment.'}
   else if(a=='rest'){bk.m='Restoring…';post=restore}
   else if(a=='exp'){post=doExport}
   else if(a=='imp'){post=doImport}
   render();if(post)post();
 });
-document.addEventListener('input',e=>{if(e.target.id=='io')io=e.target.value});
+document.addEventListener('input',e=>{const i=e.target.id;if(i=='io')io=e.target.value;else if(i=='course'){st.course=e.target.value;save()}else if(i=='date'){st.date=e.target.value;save()}});
 load();render();initCloud();
 </script></body></html>
