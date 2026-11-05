@@ -54,6 +54,8 @@ nav .on{color:var(--acc)}
 .rd{width:100%;text-align:left;background:none;border:0;border-top:1px solid var(--line);padding:10px 0;color:var(--ink);font-size:16px;font-weight:600}
 .rd small{display:block;color:var(--mut);font-weight:400;font-size:13px}
 .tbl{overflow-x:auto}
+.lbl{display:block;padding:14px;border-radius:10px;text-align:center;font-size:16px;font-weight:600;margin-top:12px;background:var(--chip);color:var(--ink);cursor:pointer}
+summary{margin-top:14px;color:var(--acc);font-weight:600;cursor:pointer}
 table{border-collapse:collapse;width:100%;font-size:14px;text-align:center}
 th,td{padding:7px 4px;border-top:1px solid var(--line)}
 th{color:var(--mut);font-weight:600;font-size:12px}
@@ -145,9 +147,37 @@ function doImport(){
   }catch(e){im='That text is not a valid backup. Paste the full text you copied.'}
   render();
 }
+async function saveFile(name,text,type){
+  try{
+    const f=new File([text],name,{type});
+    if(navigator.canShare&&navigator.canShare({files:[f]})){await navigator.share({files:[f],title:name});return 'Shared '+name+'. Choose Save to Files to keep it.'}
+  }catch(e){if(e&&e.name=='AbortError')return 'Cancelled.'}
+  try{
+    if(typeof claude!='undefined'){const d=await claude.use('downloads');if(d){await d.save({filename:name,data:text});return 'Saved '+name+'.'}}
+  }catch(e){}
+  try{
+    const u=URL.createObjectURL(new Blob([text],{type}));
+    const l=document.createElement('a');l.href=u;l.download=name;document.body.appendChild(l);l.click();l.remove();
+    setTimeout(()=>URL.revokeObjectURL(u),4000);
+    return 'Downloaded '+name+'. Look in the Files app, under Downloads.';
+  }catch(e){return 'Could not create the file. Use the text option instead.'}
+}
+async function doSaveFile(){
+  im=await saveFile('tiger5-backup-'+today()+'.json',JSON.stringify({app:'tiger5',v:1,t:Date.now(),hist:hist,cur:st}),'application/json');
+  render();
+}
+async function doCsv(){
+  if(!hist.length){im='Save a round first.';render();return}
+  const q=v=>{if(typeof v=='number')return String(v);v=String(v==null?'':v);if(/^[=+\-@]/.test(v))v="'"+v;return '"'+v.replace(/"/g,'""')+'"'};
+  const rows=[['Date','Course','Hole','Par','Score','Putts','GIR','Fairway','Chips','Bunker shots','Recovery','Wedge in hand','Missed easy up-and-down','3-putt','Par 5 bogey','Double bogey+','Wedge bogey'].map(q).join(',')];
+  hist.forEach(z=>z.h.forEach((x,i)=>{if(x.s>0){const f=flags(x);
+    rows.push([z.date||new Date(z.d).toISOString().slice(0,10),z.course||'',i+1,x.par,x.s,x.p,x.s-x.p<=x.par-2?1:0,x.par>3?(x.fw?1:0):'',x.ch,x.bk,x.rec,x.wd,x.eu,f.includes(0)?1:0,f.includes(1)?1:0,f.includes(2)?1:0,f.includes(3)?1:0].map(q).join(','))}}));
+  im=await saveFile('tiger5-rounds-'+today()+'.csv',rows.join('\n'),'text/csv');
+  render();
+}
 function ioHtml(){
   const e=s=>s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
-  return `<p class="mut">Copy your rounds as text to keep a backup, or paste a backup below to add its rounds.</p>${im?`<p class="res">${im}</p>`:''}<textarea id="io" rows="5" placeholder="Backup text appears here, or paste a backup to import">${e(io)}</textarea><button class="main" data-a="exp">Copy backup text</button><button class="main alt" data-a="imp">Import pasted backup</button>`;
+  return `<p class="mut">Save a backup file to the Files app, iCloud Drive or email, then import it later. The spreadsheet file opens in Numbers or Excel.</p>${im?`<p class="res">${im}</p>`:''}<button class="main" data-a="sf">Save backup file</button><button class="main alt" data-a="sc">Save spreadsheet (CSV)</button><label class="lbl">Import from file<input id="fileIn" type="file" accept=".json,application/json,text/plain" hidden></label><details ${io?'open':''}><summary>Copy or paste as text instead</summary><textarea id="io" rows="5" placeholder="Backup text appears here, or paste a backup to import">${e(io)}</textarea><button class="main alt" data-a="exp">Copy backup text</button><button class="main alt" data-a="imp">Import pasted backup</button></details>`;
 }
 const vp=d=>d>0?'+'+d:d<0?String(d):'E';
 const nm=d=>d<=-3?'Albatross':['Eagle','Birdie','Par','Bogey','Double bogey','Triple bogey'][d+2]||('+'+d);
@@ -253,8 +283,11 @@ document.addEventListener('click',e=>{
   else if(a=='rest'){bk.m='Restoring…';post=restore}
   else if(a=='exp'){post=doExport}
   else if(a=='imp'){post=doImport}
+  else if(a=='sf'){post=doSaveFile}
+  else if(a=='sc'){post=doCsv}
   render();if(post)post();
 });
+document.addEventListener('change',async e=>{if(e.target.id=='fileIn'&&e.target.files&&e.target.files[0]){try{io=await e.target.files[0].text()}catch(x){im='Could not read that file.';render();return}doImport()}});
 document.addEventListener('input',e=>{const i=e.target.id;if(i=='io')io=e.target.value;else if(i=='course'){st.course=e.target.value;save()}else if(i=='date'){st.date=e.target.value;save()}});
 load();render();initCloud();
 </script></body></html>
